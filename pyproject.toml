@@ -1,0 +1,17 @@
+[project]
+authors = [
+  {email = "keeganlosinski@gmail.com", name = "Keegan Losinski"}
+]
+dependencies = [
+  "canvas[test-utils]"
+]
+description = "Protocol card when a transthoracic echo is ordered and a prior TTE exists within a year (ACC/ASE AUC)."
+license = "MIT"
+name = "echo_auc_check"
+readme = "echo_auc_check/README.md"
+requires-python = ">=3.11"
+version = "0.1.0"
+
+[tool.pytest.ini_options]
+addopts = "-p no:warnings"
+python_files = ["*_tests.py", "test_*.py", "tests.py"]

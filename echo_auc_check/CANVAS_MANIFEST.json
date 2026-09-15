@@ -1,0 +1,39 @@
+{
+    "sdk_version": "0.1.4",
+    "plugin_version": "0.1.0",
+    "name": "echo_auc_check",
+    "description": "Raises a protocol card when a transthoracic echo is ordered and a prior TTE exists on the chart within the last year, citing ACC/ASE appropriate use criteria. Informs, never blocks.",
+    "components": {
+        "handlers": [
+            {
+                "class": "echo_auc_check.handlers.event_handlers:RepeatEchoCheck",
+                "description": "On imaging order update or commit, checks for a prior TTE within the lookback window and raises or resolves a protocol card.",
+                "data_access": {
+                    "event": "IMAGING_ORDER_COMMAND__POST_UPDATE",
+                    "read": [
+                        "imaging_orders",
+                        "imaging_reports",
+                        "notes"
+                    ],
+                    "write": [
+                        "protocol_cards"
+                    ]
+                }
+            }
+        ],
+        "commands": [],
+        "content": [],
+        "effects": [],
+        "views": []
+    },
+    "variables": [],
+    "tags": ["imaging", "echocardiography", "appropriate-use", "decision-support", "protocol-card"],
+    "references": [
+        "https://www.jacc.org/doi/10.1016/j.jacc.2010.11.002",
+        "https://pubmed.ncbi.nlm.nih.gov/28838362/",
+        "https://pubmed.ncbi.nlm.nih.gov/37464949/"
+    ],
+    "license": "MIT",
+    "diagram": false,
+    "readme": "./README.md"
+}
