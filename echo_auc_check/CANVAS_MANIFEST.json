@@ -1,22 +1,25 @@
 {
     "sdk_version": "0.1.4",
-    "plugin_version": "0.2.0",
+    "plugin_version": "0.3.0",
     "name": "echo_auc_check",
-    "description": "When a complete transthoracic echo is ordered and a prior complete TTE exists on the chart within six months, asks the provider whether the exam is needed (ACC/ASE appropriate use criteria). One button documents the reason in the note; snooze is the no. Informs, never blocks.",
+    "description": "When a complete transthoracic echo is ordered, checks for a prior complete TTE within six months, a pending TTE order not yet resulted, and an echo already on the schedule; asks the provider whether the exam is needed with one button that documents the reason in the note. When a duplicate is signed, tasks the other ordering provider that their pending study may be cancellable. Informs, never blocks.",
     "components": {
         "handlers": [
             {
                 "class": "echo_auc_check.handlers.event_handlers:RepeatEchoCheck",
-                "description": "On imaging order update or commit, checks for a prior complete TTE within six months and raises a protocol card with a document-reason button.",
+                "description": "On imaging order update or commit: card for prior, pending, or scheduled complete TTE; on commit, task to the other provider for a signed duplicate.",
                 "data_access": {
                     "event": "IMAGING_ORDER_COMMAND__POST_UPDATE",
                     "read": [
                         "imaging_orders",
                         "imaging_reports",
-                        "notes"
+                        "appointments",
+                        "notes",
+                        "staff"
                     ],
                     "write": [
-                        "protocol_cards"
+                        "protocol_cards",
+                        "tasks"
                     ]
                 }
             }
@@ -27,7 +30,13 @@
         "views": []
     },
     "variables": [],
-    "tags": ["imaging", "echocardiography", "appropriate-use", "decision-support", "protocol-card"],
+    "tags": [
+        "imaging",
+        "echocardiography",
+        "appropriate-use",
+        "decision-support",
+        "protocol-card"
+    ],
     "references": [
         "https://www.jacc.org/doi/10.1016/j.jacc.2010.11.002",
         "https://pubmed.ncbi.nlm.nih.gov/28838362/",
