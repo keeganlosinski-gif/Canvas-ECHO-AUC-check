@@ -1,6 +1,6 @@
 """
 Seed the local plugin-runner SQLite database with one patient who had a TTE
-about seven months ago, so `canvas emit` on the fixture event produces the card.
+about four months ago, so `canvas emit` on the fixture event produces the card.
 
 Usage:
   canvas run-plugins ./echo_auc_check --reset-db --db-seed-file fixtures/seed_local_db.py
@@ -23,13 +23,13 @@ current_note.patient.save()
 current_note.id = CURRENT_NOTE_ID
 current_note.save()
 
-# A completed TTE order from about seven months ago, on an earlier note.
+# A completed TTE order from about four months ago, on an earlier note.
 prior_note = NoteFactory.create(patient=current_note.patient)
 ImagingOrderFactory.create(
     patient=current_note.patient,
     note=prior_note,
     imaging="Echocardiogram, transthoracic, complete with Doppler (93306)",
     status=OrderStatus.COMPLETED,
-    date_time_ordered=datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=214),
+    date_time_ordered=datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=120),
 )
-print(f"seeded patient {PATIENT_ID} with a prior TTE 214 days ago")
+print(f"seeded patient {PATIENT_ID} with a prior complete TTE 120 days ago")

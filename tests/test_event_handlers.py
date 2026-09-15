@@ -82,11 +82,18 @@ def test_handler_listens_to_imaging_order_update_and_commit() -> None:
     assert EventType.Name(EventType.IMAGING_ORDER_COMMAND__POST_COMMIT) in RepeatEchoCheck.RESPONDS_TO
 
 
-def test_is_tte_matches_routine_transthoracic_studies() -> None:
+def test_is_tte_matches_complete_transthoracic_studies() -> None:
     assert is_tte("Echocardiogram, transthoracic, complete (93306)")
     assert is_tte("93307 TTE without Doppler")
-    assert is_tte("Limited echocardiogram follow-up 93308")
     assert is_tte("TTE")
+
+
+def test_is_tte_rejects_limited_echo() -> None:
+    # Limited studies are narrow follow-ups (effusion, chemo, post-procedure)
+    # and must neither trigger the card nor count as a prior.
+    assert not is_tte("Limited echocardiogram follow-up 93308")
+    assert not is_tte("Echocardiogram, transthoracic, limited (93308)")
+    assert not is_tte("TTE limited")
 
 
 def test_is_tte_rejects_non_tte_and_non_echo_studies() -> None:
@@ -115,10 +122,27 @@ def test_no_card_when_no_prior_echo_exists() -> None:
     assert effects == []
 
 
-def test_no_card_when_prior_echo_is_outside_the_window() -> None:
+def test_no_card_when_prior_echo_is_outside_the_six_month_window() -> None:
     note = NoteFactory.create()
-    _prior_order(note.patient, days_ago=400)
-    _prior_report(note.patient, days_ago=380)
+    _prior_order(note.patient, days_ago=200)   # ~6.5 months
+    _prior_report(note.patient, days_ago=300)
+    effects = RepeatEchoCheck(event=_event(note)).compute()
+    assert effects == []
+
+
+def test_no_card_when_limited_echo_is_ordered() -> None:
+    note = NoteFactory.create()
+    _prior_order(note.patient, days_ago=60)
+    effects = RepeatEchoCheck(
+        event=_event(note, image_text="Echocardiogram, transthoracic, limited (93308)")
+    ).compute()
+    assert effects == []
+
+
+def test_prior_limited_echo_does_not_count_as_prior() -> None:
+    note = NoteFactory.create()
+    _prior_order(note.patient, days_ago=60, imaging="Echocardiogram, limited (93308)")
+    _prior_report(note.patient, days_ago=30, name="Limited TTE, pericardial effusion follow-up")
     effects = RepeatEchoCheck(event=_event(note)).compute()
     assert effects == []
 
@@ -161,7 +185,7 @@ def test_no_card_for_another_patients_echo() -> None:
 
 def test_card_raised_for_prior_tte_order_inside_window() -> None:
     note = NoteFactory.create()
-    _prior_order(note.patient, days_ago=210)  # ~7 months
+    _prior_order(note.patient, days_ago=120)  # ~4 months
     effects = RepeatEchoCheck(event=_event(note)).compute()
 
     assert len(effects) == 1
@@ -172,9 +196,26 @@ def test_card_raised_for_prior_tte_order_inside_window() -> None:
     data = payload["data"]
     assert data["status"] == "due"
     assert data["can_be_snoozed"] is True
-    assert "7 months ago" in data["narrative"]
+    assert data["narrative"].startswith("Is this exam needed?")
+    assert "4 months ago" in data["narrative"]
     assert "rarely appropriate" in data["narrative"]
-    assert data["recommendations"] == []  # order has no report document to link
+
+
+def test_card_carries_a_yes_button_that_opens_a_prefilled_plan_entry() -> None:
+    note = NoteFactory.create()
+    _prior_order(note.patient, days_ago=120)
+    effects = RepeatEchoCheck(event=_event(note)).compute()
+    recs = _payload(effects[0])["data"]["recommendations"]
+
+    assert len(recs) == 1  # no report document on an order, so no "view" link
+    yes = recs[0]
+    assert yes["title"] == "Yes, this exam is needed"
+    assert yes["button"] == "Document reason"
+    assert len(yes["commands"]) == 1
+    cmd = yes["commands"][0]
+    assert cmd["command"]["type"] == "plan"
+    assert cmd["context"]["narrative"].startswith("Repeat TTE indicated despite prior complete study on ")
+    assert cmd["context"]["note_uuid"] == str(note.id)
 
 
 def test_card_raised_for_prior_tte_report_inside_window() -> None:
@@ -189,21 +230,23 @@ def test_card_raised_for_prior_tte_report_inside_window() -> None:
 
 def test_card_uses_the_most_recent_prior_study() -> None:
     note = NoteFactory.create()
-    _prior_order(note.patient, days_ago=300)
+    _prior_order(note.patient, days_ago=150)
     _prior_report(note.patient, days_ago=40)
     effects = RepeatEchoCheck(event=_event(note)).compute()
     data = _payload(effects[0])["data"]
     assert "1 month ago" in data["narrative"]
 
 
-def test_card_is_satisfied_when_order_carries_a_comment() -> None:
+def test_card_stays_due_even_when_order_carries_a_comment() -> None:
+    # The plugin never infers an indication from free text. The provider
+    # answers the card's question with the button or snoozes it.
     note = NoteFactory.create()
     _prior_order(note.patient, days_ago=120)
     effects = RepeatEchoCheck(
         event=_event(note, comment="New murmur on exam, reassess MR severity")
     ).compute()
     assert len(effects) == 1
-    assert _payload(effects[0])["data"]["status"] == "satisfied"
+    assert _payload(effects[0])["data"]["status"] == "due"
 
 
 def test_patient_is_resolved_from_note_when_context_has_no_patient() -> None:
@@ -216,6 +259,6 @@ def test_patient_is_resolved_from_note_when_context_has_no_patient() -> None:
 
 def test_prior_echo_exactly_at_window_edge_counts() -> None:
     note = NoteFactory.create()
-    _prior_report(note.patient, days_ago=365)
+    _prior_report(note.patient, days_ago=183)
     effects = RepeatEchoCheck(event=_event(note)).compute()
     assert len(effects) == 1
